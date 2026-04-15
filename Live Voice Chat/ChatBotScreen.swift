@@ -7,103 +7,223 @@
 
 import SwiftUI
 
+// MARK: - Theme
+enum AppTheme {
+    // App background
+    static let appBackground     = Color(hex: "#FAFAFA")
+    static let cardBackground    = Color(hex: "#FFFFFF")
+
+    // User bubble — Green
+    static let userBubble        = Color(hex: "#4CAF50")
+    static let userBubbleLight   = Color(hex: "#E8F5E9")
+    static let userBubbleDark    = Color(hex: "#2E7D32")
+
+    // AI bubble — Amber
+    static let aiBubble          = Color(hex: "#FFD54F")
+    static let aiBubbleLight     = Color(hex: "#FFF8E1")
+    static let aiBubbleDark      = Color(hex: "#F9A825")
+
+    // Buttons — Pink
+    static let buttonPrimary     = Color(hex: "#FF5C8A")
+    static let buttonLight       = Color(hex: "#FFE4EC")
+    static let buttonDark        = Color(hex: "#C2185B")
+
+    // Labels / chips — Yellow-Orange
+    static let labelPrimary      = Color(hex: "#FFB74D")
+    static let labelLight        = Color(hex: "#FFF3E0")
+    static let labelDark         = Color(hex: "#EF6C00")
+
+    // Text
+    static let textPrimary       = Color(hex: "#212121")
+    static let textSecondary     = Color(hex: "#616161")
+    static let textPlaceholder   = Color(hex: "#9E9E9E")
+
+    // Font helper — Avenir Next (fallback handled by SwiftUI automatically)
+    static func font(_ style: AvenirStyle, size: CGFloat) -> Font {
+        .custom(style.rawValue, size: size)
+    }
+
+    enum AvenirStyle: String {
+        case regular   = "AvenirNext-Regular"
+        case medium    = "AvenirNext-Medium"
+        case demiBold  = "AvenirNext-DemiBold"
+        case bold      = "AvenirNext-Bold"
+    }
+}
+
 struct ChatBotScreen: View {
-    
+
     @State private var userText: String = ""
     @State private var messages: [Message] = [
-        Message(text: "Hello! How can I help you?", isUser: false)
+        Message(text: "Hello! How can I help you today?", isUser: false)
     ]
-    
+    @FocusState private var inputFocused: Bool
+
     var body: some View {
         ZStack {
-            Color.indigo.opacity(0.2)
+            AppTheme.appBackground
                 .ignoresSafeArea()
-            
+
             VStack(spacing: 0) {
-                
-                // Header
-                Text("Chat Bot")
-                    .bold()
-                    .font(.title)
-                    .padding()
-                
-                // Chat Area
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            ForEach(messages) { message in
-                                HStack {
-                                    if message.isUser {
-                                        Spacer()
-                                        MessageBubble(text: message.text, isUser: true)
-                                    } else {
-                                        MessageBubble(text: message.text, isUser: false)
-                                        Spacer()
-                                    }
-                                }
-                                .id(message.id)
-                            }
-                        }
-                        .padding()
-                    }
-                    .onChange(of: messages.count) { _ in
-                        if let lastID = messages.last?.id {
-                            withAnimation {
-                                proxy.scrollTo(lastID, anchor: .bottom)
-                            }
-                        }
-                    }
-                }
-                
-                // Input Field
-                HStack{
-                    TextField("Enter the text", text: $userText)
-                        .padding()
-                        .frame(maxWidth: .infinity, minHeight: 50)
-                        .background(Color.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 20))
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 20)
-                                .stroke(Color.gray, lineWidth: 1)
-                        }
-                        .onSubmit {
-                            sendMessage() //on enter btn hit
-                        }
-                    
-                    //send Button
-                    Button {
-                        sendMessage()
-                    } label: {
-                        Image(systemName: "paperplane.circle.fill")
-                            .resizable()
-                            .frame(width: 40, height: 40)
-                            .foregroundStyle(Color.indigo)
-                    }
-                    
-                    
-                }
-                .padding(.horizontal)
+                header
+
+                chatArea
+
+                inputBar
             }
-            .padding()
         }
     }
-    
+
+    // MARK: - Header
+    private var header: some View {
+        HStack(spacing: 14) {
+            ZStack {
+                Circle()
+                    .fill(AppTheme.aiBubbleLight)
+                    .frame(width: 48, height: 48)
+                Image(systemName: "sparkles")
+                    .font(.system(size: 22, weight: .semibold))
+                    .foregroundStyle(AppTheme.aiBubbleDark)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Chat Assistant")
+                    .font(AppTheme.font(.bold, size: 24))
+                    .foregroundStyle(AppTheme.textPrimary)
+
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(AppTheme.userBubble)
+                        .frame(width: 8, height: 8)
+                    Text("Online")
+                        .font(AppTheme.font(.medium, size: 15))
+                        .foregroundStyle(AppTheme.textSecondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 16)
+        .background(AppTheme.cardBackground)
+        .overlay(alignment: .bottom) {
+            Rectangle()
+                .fill(Color.black.opacity(0.05))
+                .frame(height: 1)
+        }
+    }
+
+    // MARK: - Chat Area
+    private var chatArea: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(spacing: 16) {
+                    ForEach(messages) { message in
+                        MessageRow(message: message)
+                            .id(message.id)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 20)
+            }
+            .onChange(of: messages.count) { _ in
+                if let lastID = messages.last?.id {
+                    withAnimation(.easeOut(duration: 0.25)) {
+                        proxy.scrollTo(lastID, anchor: .bottom)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Input Bar
+    private var inputBar: some View {
+        HStack(spacing: 12) {
+            HStack(spacing: 10) {
+                TextField("", text: $userText, prompt:
+                    Text("Type a message…")
+                        .font(AppTheme.font(.regular, size: 18))
+                        .foregroundColor(AppTheme.textPlaceholder)
+                )
+                .font(AppTheme.font(.regular, size: 18))
+                .foregroundStyle(AppTheme.textPrimary)
+                .focused($inputFocused)
+                .submitLabel(.send)
+                .onSubmit { sendMessage() }
+
+                if !userText.isEmpty {
+                    Button {
+                        userText = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 20))
+                            .foregroundStyle(AppTheme.textPlaceholder)
+                    }
+                }
+            }
+            .padding(.horizontal, 18)
+            .frame(minHeight: 54)
+            .background(AppTheme.cardBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 27, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 27, style: .continuous)
+                    .stroke(
+                        inputFocused ? AppTheme.userBubble.opacity(0.6)
+                                     : Color.black.opacity(0.08),
+                        lineWidth: inputFocused ? 1.5 : 1
+                    )
+            )
+
+            Button {
+                sendMessage()
+            } label: {
+                ZStack {
+                    Circle()
+                        .fill(
+                            userText.trimmingCharacters(in: .whitespaces).isEmpty
+                            ? AppTheme.buttonPrimary.opacity(0.45)
+                            : AppTheme.buttonPrimary
+                        )
+                        .frame(width: 54, height: 54)
+                        .shadow(color: AppTheme.buttonPrimary.opacity(0.35),
+                                radius: 8, x: 0, y: 4)
+
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .offset(x: -1, y: 1)
+                }
+            }
+            .disabled(userText.trimmingCharacters(in: .whitespaces).isEmpty)
+            .animation(.easeInOut(duration: 0.15), value: userText)
+        }
+        .padding(.horizontal, 16)
+        .padding(.top, 12)
+        .padding(.bottom, 14)
+        .background(
+            AppTheme.cardBackground
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(Color.black.opacity(0.05))
+                        .frame(height: 1)
+                }
+        )
+    }
+
     // MARK: - Actions
     private func sendMessage() {
         let trimmed = userText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        
-        // Add user message
+
         messages.append(Message(text: trimmed, isUser: true))
         userText = ""
-        
-        // Simulate bot response
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             let reply = generateBotReply(for: trimmed)
             messages.append(Message(text: reply, isUser: false))
         }
     }
-    
+
     private func generateBotReply(for text: String) -> String {
         return "You said: \(text)"
     }
@@ -116,19 +236,100 @@ struct Message: Identifiable {
     let isUser: Bool
 }
 
-// MARK: - UI
+// MARK: - Message Row
+private struct MessageRow: View {
+    let message: Message
+
+    var body: some View {
+        HStack(alignment: .bottom, spacing: 8) {
+            if message.isUser {
+                Spacer(minLength: 40)
+                MessageBubble(text: message.text, isUser: true)
+                Avatar(isUser: true)
+            } else {
+                Avatar(isUser: false)
+                MessageBubble(text: message.text, isUser: false)
+                Spacer(minLength: 40)
+            }
+        }
+    }
+}
+
+// MARK: - Avatar
+private struct Avatar: View {
+    let isUser: Bool
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(isUser ? AppTheme.userBubbleLight : AppTheme.aiBubbleLight)
+                .frame(width: 36, height: 36)
+            Image(systemName: isUser ? "person.fill" : "sparkles")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(isUser ? AppTheme.userBubbleDark : AppTheme.aiBubbleDark)
+        }
+    }
+}
+
+// MARK: - Message Bubble
 private struct MessageBubble: View {
     var text: String
     var isUser: Bool
-    
+
     var body: some View {
         Text(text)
-            .font(.body)
-            .padding(12)
-            .background(isUser ? Color.indigo : Color.white)
-            .foregroundStyle(isUser ? .white : .black)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .frame(maxWidth: 260, alignment: isUser ? .trailing : .leading)
+            .font(AppTheme.font(.medium, size: 18))
+            .lineSpacing(4)
+            .foregroundStyle(AppTheme.textPrimary)
+            .padding(.vertical, 14)
+            .padding(.horizontal, 18)
+            .background(isUser ? AppTheme.userBubbleLight : AppTheme.aiBubbleLight)
+            .overlay(
+                bubbleShape
+                    .stroke(
+                        isUser ? AppTheme.userBubble.opacity(0.35)
+                               : AppTheme.aiBubbleDark.opacity(0.25),
+                        lineWidth: 1
+                    )
+            )
+            .clipShape(bubbleShape)
+            .shadow(color: Color.black.opacity(0.04), radius: 4, x: 0, y: 2)
+            .frame(maxWidth: 280, alignment: isUser ? .trailing : .leading)
+    }
+
+    private var bubbleShape: some Shape {
+        UnevenRoundedRectangle(
+            topLeadingRadius: 20,
+            bottomLeadingRadius: isUser ? 20 : 6,
+            bottomTrailingRadius: isUser ? 6 : 20,
+            topTrailingRadius: 20,
+            style: .continuous
+        )
+    }
+}
+
+// MARK: - Color Hex Helper
+extension Color {
+    init(hex: String) {
+        let h = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&int)
+        let r, g, b, a: UInt64
+        switch h.count {
+        case 6:
+            (r, g, b, a) = ((int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF, 255)
+        case 8:
+            (r, g, b, a) = ((int >> 24) & 0xFF, (int >> 16) & 0xFF, (int >> 8) & 0xFF, int & 0xFF)
+        default:
+            (r, g, b, a) = (0, 0, 0, 255)
+        }
+        self.init(
+            .sRGB,
+            red:   Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
     }
 }
 
