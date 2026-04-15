@@ -10,9 +10,7 @@ import SwiftUI
 struct ChatBotScreen: View {
 
     @State private var userText: String = ""
-    @State private var messages: [Message] = [
-        Message(text: "Hello! How can I help you today?", isUser: false)
-    ]
+    @State private var messages: [Message] = mockConversation
     @FocusState private var inputFocused: Bool
 
     var body: some View {
@@ -28,6 +26,9 @@ struct ChatBotScreen: View {
                 inputBar
             }
             
+        }
+        .onAppear{
+            print("\(messages)")
         }
     }
 
@@ -50,10 +51,11 @@ struct ChatBotScreen: View {
                     .foregroundStyle(AppTheme.textPrimary)
 
                 HStack(spacing: 6) {
-                    Circle()
-                        .fill(AppTheme.userBubble)
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(AppTheme.buttonDark)
                         .frame(width: 8, height: 8)
-                    Text("Online")
+                    
+                    Text("Model: Nemotron 30B")
                         .font(AppTheme.font(.medium, size: 15))
                         .foregroundStyle(AppTheme.textSecondary)
                 }
@@ -183,7 +185,7 @@ struct ChatBotScreen: View {
     }
 
     private func generateBotReply(for text: String) -> String {
-        return "You said: \(text)"
+        return "Chatbot responded for the message : \(text)"
     }
 }
 
