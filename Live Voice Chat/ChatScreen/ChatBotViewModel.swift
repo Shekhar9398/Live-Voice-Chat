@@ -8,57 +8,70 @@ import Combine
 
 @MainActor
 class ChatBotViewModel: ObservableObject {
-    
+
     // MARK: - Dependencies
     private let speechService = SpeechToTextService()
-    
+
     // MARK: - UI State
     @Published var transcript: String = ""
     @Published var isRecording: Bool = false
     @Published var errorMessage: String?
-    
+
     // MARK: - Task
     private var transcriptionTask: Task<Void, Never>?
-    
+
+    // MARK: - Callbacks
+    /// Fired once the recognizer delivers its final result after `stopRecording()`.
+    var onFinalTranscript: ((String) -> Void)?
+
     // MARK: - Actions
     func startRecording() {
-        guard !isRecording else { return }
-        
-        isRecording = true
+        guard transcriptionTask == nil else { return }
+
         transcript = ""
         errorMessage = nil
-        
-        transcriptionTask = Task {
+
+        transcriptionTask = Task { [weak self] in
+            guard let self else { return }
+
+            defer {
+                self.isRecording = false
+                self.transcriptionTask = nil
+            }
+
+            let speechAuthorized = await PermissionManager.requestSpeechPermission()
+            let micAuthorized = await PermissionManager.requestMicrophonePermission()
+
+            guard speechAuthorized, micAuthorized else {
+                self.errorMessage = "Microphone and speech permissions are required."
+                return
+            }
+
+            self.isRecording = true
+
             do {
-                let isAuthorized = await PermissionManager.requestSpeechPermission()
-                guard isAuthorized else {
-                    throw RecognizerError.recognizerUnavailable
-                }
-                
-                for try await text in speechService.startStreaming() {
+                for try await text in self.speechService.startStreaming() {
                     self.transcript = text
                 }
-                
-                // stream finished normally
-                self.isRecording = false
-                
             } catch is CancellationError {
-                // ignore cancellation (user tapped stop)
-                
+                // user cancelled — nothing to report
             } catch {
                 self.errorMessage = error.localizedDescription
-                self.isRecording = false
+            }
+
+            let finalText = self.transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+            self.transcript = ""
+            if !finalText.isEmpty {
+                self.onFinalTranscript?(finalText)
             }
         }
     }
-    
+
+    /// Tells the recognizer the user has stopped speaking. The task continues
+    /// until the recognizer delivers its final result, then fires
+    /// `onFinalTranscript`.
     func stopRecording() {
         guard isRecording else { return }
-        
-        isRecording = false
-        transcriptionTask?.cancel()
-        transcriptionTask = nil
-        
         speechService.stopStreaming()
     }
 }
