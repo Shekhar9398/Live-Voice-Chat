@@ -11,7 +11,7 @@ import SwiftUI
 struct Live_Voice_ChatApp: App {
     var body: some Scene {
         WindowGroup {
-            ChatBotScreen()
+            ChatScreen()
         }
     }
 }

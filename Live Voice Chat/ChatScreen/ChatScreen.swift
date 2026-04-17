@@ -7,43 +7,45 @@
 
 import SwiftUI
 
-struct ChatBotScreen: View {
-    @StateObject private var viewModel = ChatBotViewModel()
-
+struct ChatScreen: View {
+    @StateObject private var viewModel = ChatViewModel()
+    
     @State private var userText: String = ""
     @State private var messages: [Message] = []
     @State private var pulse: Bool = false
     @FocusState private var inputFocused: Bool
-
+    
     var body: some View {
         ZStack {
             AppTheme.appBackground
                 .ignoresSafeArea()
-
+            
             VStack(spacing: 0) {
                 header
-
+                
                 chatArea
-
-                if viewModel.isRecording || !viewModel.transcript.isEmpty {
+                
+                if viewModel.isRecording || !viewModel.text.isEmpty {
                     liveTranscriptBar
                 }
-
+                
                 inputBar
             }
-
         }
         .onAppear {
-            viewModel.onFinalTranscript = { finalText in
+            viewModel.onFinalText = { finalText in
                 sendVoiceMessage(finalText)
             }
         }
         .alert("Something went wrong",
-               isPresented: .constant(viewModel.errorMessage != nil),
+               isPresented: Binding(
+                get: { viewModel.error != nil },
+                set: { _ in viewModel.error = nil }
+               ),
                actions: {
-            Button("OK") { viewModel.errorMessage = nil }
+            Button("OK") { viewModel.error = nil }
         }, message: {
-            Text(viewModel.errorMessage ?? "")
+            Text(viewModel.error ?? "")
         })
     }
     
@@ -115,15 +117,17 @@ struct ChatBotScreen: View {
     private var liveTranscriptBar: some View {
         HStack(spacing: 10) {
             SoundWave(isActive: viewModel.isRecording)
-
-            Text(viewModel.transcript.isEmpty ? "Listening…" : viewModel.transcript)
+            
+            Text(viewModel.text.isEmpty ? "Listening…" : viewModel.text)
                 .font(AppTheme.font(.medium, size: 16))
-                .foregroundStyle(viewModel.transcript.isEmpty
-                                 ? AppTheme.textPlaceholder
-                                 : AppTheme.textPrimary)
+                .foregroundStyle(
+                    viewModel.text.isEmpty
+                    ? AppTheme.textPlaceholder
+                    : AppTheme.textPrimary
+                )
                 .lineLimit(2)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .animation(.easeInOut(duration: 0.15), value: viewModel.transcript)
+                .animation(.easeInOut(duration: 0.15), value: viewModel.text)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -135,7 +139,7 @@ struct ChatBotScreen: View {
         }
         .transition(.move(edge: .bottom).combined(with: .opacity))
     }
-
+    
     // MARK: - Input Bar
     private var inputBar: some View {
         
@@ -165,7 +169,7 @@ struct ChatBotScreen: View {
                                 .scaleEffect(pulse ? 1.6 : 1.0)
                                 .opacity(pulse ? 0 : 0.9)
                         }
-
+                        
                         Image(systemName: viewModel.isRecording ? "mic.fill" : "mic")
                             .resizable()
                             .frame(width: 20, height: 30)
@@ -254,25 +258,25 @@ struct ChatBotScreen: View {
     private func sendVoiceMessage(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-
+        
         messages.append(Message(text: trimmed, isUser: true))
-
+        
         DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
             let reply = generateBotReply(for: trimmed)
             messages.append(Message(text: reply, isUser: false))
         }
     }
-
+    
     private func generateBotReply(for text: String) -> String {
         return "Chatbot responded for the message : \(text)"
     }
-
+    
     ///MARK:- Actions
     private func handleMicTap() {
         if viewModel.isRecording {
-            viewModel.stopRecording()
+            viewModel.stop()
         } else {
-            viewModel.startRecording()
+            viewModel.start()
         }
     }
     
@@ -359,5 +363,5 @@ struct ChatBotScreen: View {
 
 
 #Preview {
-    ChatBotScreen()
+    ChatScreen()
 }
